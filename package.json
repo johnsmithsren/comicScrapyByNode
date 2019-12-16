@@ -24,7 +24,6 @@
     "Reptitle"
   ],
   "author": "xizhouh@gmail.com",
-  "license": "MIT",
   "bin": {
     "reptitle": "./index.js"
   },
@@ -36,7 +35,11 @@
     "bluebird": "^3.5.3",
     "cheerio": "^1.0.0-rc.2",
     "iconv-lite": "^0.4.24",
+    "images-to-pdf": "^1.0.3",
+    "lodash": "^4.17.15",
+    "log4js": "^6.1.0",
     "p-limit": "^2.0.0",
+    "phantom": "^6.3.0",
     "request": "^2.88.0",
     "request-promise": "^4.2.2"
   },

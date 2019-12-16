@@ -1,100 +1,169 @@
+/*
+ * @Auther: renjm
+ * @Date: 2019-12-12 15:43:28
+ * @LastEditTime: 2019-12-16 14:50:28
+ * @Description:
+ */
 const { options } = require('./lib/options');
 const { fetch } = require('./lib/fetch');
 const { flatten } = require('./lib/utils');
+const phantom = require('phantom')
 const Promise = require('bluebird');
 const limit = require('p-limit')(10);
-const MOVIE_DETAIL_PAGE_URI_SELECTOR = '.co_content8 .ulink';
-const MOVIE_TITLE_SELECTOR = '#header > div > div.bd2 > div.bd3 > div.bd3r > div.co_area2 > div.title_all > h1 > font';
-const MOVIE_IMAGE_SELECTOR = '#Zoom span img';
-const MOVIE_DOWNLOAD_LINK_SELECTOR = '#Zoom > span > table > tbody > tr > td > a';
+const COMIC_DETAIL_PAGE_URI_SELECTOR = '#chapter-list-1 > li > a';
+const COMIC_IMAGE_DETAIL_IMAGE_URI_SELECTOR = '#images > img';
+const COMIC_IMAGE_DETAIL_PAGES = '#images > p'
+const COMIC_TITLE = 'body > div.chapter-view > div.wrap_last_head.autoHeight > div > h1 > a'
+const COMIC_CHAPTER = 'body > div.chapter-view > div.wrap_last_head.autoHeight > div > h2'
+const _ = require('lodash')
 const DEFAULT_INCLUDE = ['title', 'imgUrl', 'desc', 'downloadLink', 'descPageLink'];
-const MOVIE_DESC_SELETOR = '#Zoom > span > p:nth-child(1)';
+const log4js = require("log4js");
+const iconv = require('iconv-lite');
+const cheerio = require('cheerio');
+const dirname = 'Comic'
+const fs = require('fs')
+const request = require('request')
+const img2pdf = require('images-to-pdf')
+const hostdir = __dirname
+log4js.configure({
+  appenders: {
+    clone: {
+      type: "console"
+    }
+  },
+  categories: {
+    default: {
+      appenders: ["clone"],
+      level: "trace"
+    }
+  }
+});
+const logger = require("log4js").getLogger("download");
 
-/**
- * Get movie detail page links
- *
- * @param {Object} cheerio
- * @returns {Array} movieDetailPageLinks
- */
-function handleGetMovieDetailPageLinks (cheerio) {
-  return cheerio(MOVIE_DETAIL_PAGE_URI_SELECTOR).map((idx, ele) => {
+
+function getComicChapterUrl(cheerio) {
+  return cheerio(COMIC_DETAIL_PAGE_URI_SELECTOR).map((idx, ele) => {
     return cheerio(ele).attr('href');
   }).get() || [];
 }
 
-/**
- * Get movie details
- *
- * @param {Object} cheerio
- * @param {Object} config
- * @returns {Array} movieDetails
- */
-function handleGetMovieDetails (cheerio, uri, config) {
-  let { include } = config;
-  if (!include.length) include = DEFAULT_INCLUDE;
-  let result = {};
-  include.forEach(item => {
-    if (item === 'title') {
-      const title = cheerio(MOVIE_TITLE_SELECTOR).text();
-      if (title) result[item] = cheerio(MOVIE_TITLE_SELECTOR).text();
-      else return false;
-    }
-    if (item === 'imgUrl') {
-      const imgUrl = cheerio(MOVIE_IMAGE_SELECTOR).eq(0).map((idx, ele) => {
-        return cheerio(ele).attr('src');
-      }).get()[0];
-      if (imgUrl) result[item] = imgUrl;
-      else return false;
-    }
-    if (item === 'desc') {
-      const desc = cheerio(MOVIE_DESC_SELETOR).text();
-      if (desc) result[item] = desc;
-      else return false;
-    }
-    if (item === 'downloadLink') {
-      const downloadLink = cheerio(MOVIE_DOWNLOAD_LINK_SELECTOR).text();
-      if (downloadLink) result[item] = downloadLink;
-      else return false;
-    }
-    if (item === 'descPageLink') {
-      const descPageLink = uri;
-      if (descPageLink) result[item] = descPageLink;
-      else return false;
-    }
-  });
-  return JSON.stringify(result) === '{}' ? undefined : result;
+
+let downloadImage = async (imageUrl) => {
+  let instance = await phantom.create();
+  let page = await instance.createPage();
+  await page.open(imageUrl);
+  await page.property('viewportSize', {
+    width: 1920,
+    height: 1080
+  })
+  let content = await page.property('content')
+  $ = cheerio.load(content)
+  chapterUrls = []
+  let imageSrc = $(COMIC_IMAGE_DETAIL_IMAGE_URI_SELECTOR).map((idx, ele) => {
+    return cheerio(ele).attr('src');
+  }).get()
+  let ComicTitle = $(COMIC_TITLE).map((idx, ele) => {
+    return cheerio(ele).text();
+  }).get()
+  let ComicChapter = $(COMIC_CHAPTER).map((idx, ele) => {
+    return cheerio(ele).text();
+  }).get()
+  let currentPage = $(COMIC_IMAGE_DETAIL_PAGES).map((idx, ele) => {
+    return cheerio(ele).text();
+  }).get()
+  currentPage = _.toNumber(_.get(_.split(_.get(_.split(currentPage, '/'), 0), '('), 1))
+  const dstpath = `${hostdir}/${ComicTitle}/${ComicChapter}`
+  const imagePath = `${dstpath}/${currentPage}.jpg`
+  if (!fs.existsSync(dstpath)) {
+    await fs.mkdirSync(dstpath);
+    console.log(dstpath)
+    await request(imageSrc[0]).pipe(fs.createWriteStream(imagePath))
+  } else {
+    await request(imageSrc[0]).pipe(fs.createWriteStream(imagePath))
+  }
+  return []
 }
 
-/**
- * Get Dytt movies
- *
- * @param {Object} config
- * @returns {Promise} movieDetails
- */
-module.exports = (config) => {
+let getChapterImageUrl = async (chapterLink) => {
+  // if (chapterLink != 'https://www.manhuadui.com/manhua/haizeiwang/438940.html') {
+  //   return []
+  // }
+  let instance = await phantom.create();
+  let page = await instance.createPage();
+  await page.open(chapterLink);
+  await page.property('viewportSize', {
+    width: 1920,
+    height: 1080
+  })
+  let content = await page.property('content')
+  $ = cheerio.load(content)
+  chapterUrls = []
+  let totalPage = $(COMIC_IMAGE_DETAIL_PAGES).map((idx, ele) => {
+    return cheerio(ele).text();
+  }).get()
+  totalPage = _.toNumber(_.get(_.split(_.get(_.split(totalPage, '/'), 1), ')'), 0, 0))
+  for (let i = 1; i <= totalPage; i++) {
+    // https://www.manhuadui.com/manhua/haizeiwang/438940.html?p=2
+    chapterUrls.push(`${chapterLink}?p=${i}`);
+  }
+  let ComicTitle = $(COMIC_TITLE).map((idx, ele) => {
+    return cheerio(ele).text();
+  }).get()
+  let ComicChapter = $(COMIC_CHAPTER).map((idx, ele) => {
+    return cheerio(ele).text();
+  }).get()
+  return { chapterUrls, ComicTitle, ComicChapter }
+}
+
+let getComicChapterUrlList = async (config) => {
   config = config || { page: 1, include: DEFAULT_INCLUDE };
   if (!config.page) throw Error('Config.page is required');
+  let comicUrl = [];
   let pool = [];
   for (let i = 0; i < 1; i++) {
     pool.push(limit(() =>
-      fetch({ ...options(`https://www.dytt8.net/html/gndy/dyzz/list_23_${i + 1}.html`) })
-        .then($ => handleGetMovieDetailPageLinks($))
+      fetch({ ...options(`https://www.manhuadui.com/manhua/haizeiwang/`) })
+        .then($ => getComicChapterUrl($))
         .catch(err => err.toString())
     ));
   }
   return Promise.all(pool)
-    .then(movieDetailPageLinks => flatten(movieDetailPageLinks)) // get solo movie link
-    .then(movieDetailPageLinks => {
+    .then(comicChapterList => flatten(comicChapterList)) // get solo movie link
+    .then(comicChapterList => {
       pool = [];
-      for (let i = 0; i < movieDetailPageLinks.length; i++) {
-        pool.push(limit(() =>
-          fetch({ ...options(`https://www.dytt8.net${movieDetailPageLinks[i]}`) })
-            .then($ => handleGetMovieDetails($, `https://www.dytt8.net${movieDetailPageLinks[i]}`, config))
-            .catch(err => err.toString())
-        ));
+      for (let i = 0; i < comicChapterList.length; i++) {
+        comicUrl.push(`https://www.manhuadui.com${comicChapterList[i]}`)
       }
-      return pool;
+      return comicUrl;
     })
-    .then(pool => Promise.all(pool)) // get solo movie details
     .then(result => result.filter(v => v));
 };
+
+
+(async () => {
+  try {
+    let chapterList = await getComicChapterUrlList({
+      page: 1,
+      include: ['title', 'imgUrl', 'desc']
+    })
+    for (let chapterLink of chapterList) {
+      let { chapterUrls, ComicTitle, ComicChapter } = await getChapterImageUrl(chapterLink);
+      if (_.isEmpty(chapterUrls)) {
+        continue
+      }
+      for (let imageUrl of chapterUrls) {
+        await downloadImage(imageUrl)
+      }
+      // let comicList = await fs.readdirSync(`${__dirname}/${_.get(ComicTitle, '0')}/${_.get(ComicChapter, '0')}`)
+      // comicList = comicList.sort((a, b) =>
+      //   _.toNumber(_.get(_.split(a, '.'), '0')) > _.toNumber(_.get(_.split(b, '.'), '0')) ? 1 : -1
+      // );
+      // comicList = _.transform(comicList, (result, comicPath) => result.push(`${__dirname}/${_.get(ComicTitle, '0')}/${_.get(ComicChapter, '0')}/${comicPath}`), [])
+      // await img2pdf(comicList, `${__dirname}/${_.get(ComicChapter, '0')}.pdf`)
+    }
+    logger.info("下载完成");
+  } catch (e) {
+    logger.error(e);
+  }
+})();
+
