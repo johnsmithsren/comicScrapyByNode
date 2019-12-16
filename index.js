@@ -1,7 +1,7 @@
 /*
  * @Auther: renjm
  * @Date: 2019-12-12 15:43:28
- * @LastEditTime: 2019-12-16 15:55:15
+ * @LastEditTime: 2019-12-16 17:33:57
  * @Description:
  */
 const { options } = require('./lib/options');
@@ -57,6 +57,7 @@ let downloadImage = async (imageUrl) => {
   //   height: 1080
   // })
   let content = await page.property('content')
+  page.close();//关闭网页
   $ = cheerio.load(content)
   chapterUrls = []
   let imageSrc = $(COMIC_IMAGE_DETAIL_IMAGE_URI_SELECTOR).map((idx, ele) => {
@@ -100,6 +101,7 @@ let getChapterImageUrl = async (chapterLink) => {
   //   height: 1080
   // })
   let content = await page.property('content')
+  page.close();//关闭网页
   $ = cheerio.load(content)
   chapterUrls = []
   let totalPage = $(COMIC_IMAGE_DETAIL_PAGES).map((idx, ele) => {
