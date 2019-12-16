@@ -1,7 +1,7 @@
 /*
  * @Auther: renjm
  * @Date: 2019-12-12 15:43:28
- * @LastEditTime: 2019-12-16 14:50:28
+ * @LastEditTime: 2019-12-16 15:55:15
  * @Description:
  */
 const { options } = require('./lib/options');
@@ -52,10 +52,10 @@ let downloadImage = async (imageUrl) => {
   let instance = await phantom.create();
   let page = await instance.createPage();
   await page.open(imageUrl);
-  await page.property('viewportSize', {
-    width: 1920,
-    height: 1080
-  })
+  // await page.property('viewportSize', {
+  //   width: 1920,
+  //   height: 1080
+  // })
   let content = await page.property('content')
   $ = cheerio.load(content)
   chapterUrls = []
@@ -72,6 +72,10 @@ let downloadImage = async (imageUrl) => {
     return cheerio(ele).text();
   }).get()
   currentPage = _.toNumber(_.get(_.split(_.get(_.split(currentPage, '/'), 0), '('), 1))
+  const comicTitlePath = `${hostdir}/${ComicTitle}`
+  if (!fs.existsSync(comicTitlePath)) {
+    await fs.mkdirSync(comicTitlePath);
+  }
   const dstpath = `${hostdir}/${ComicTitle}/${ComicChapter}`
   const imagePath = `${dstpath}/${currentPage}.jpg`
   if (!fs.existsSync(dstpath)) {
@@ -85,16 +89,16 @@ let downloadImage = async (imageUrl) => {
 }
 
 let getChapterImageUrl = async (chapterLink) => {
-  // if (chapterLink != 'https://www.manhuadui.com/manhua/haizeiwang/438940.html') {
-  //   return []
-  // }
+  if (chapterLink != 'https://www.manhuadui.com/manhua/haizeiwang/438940.html') {
+    return []
+  }
   let instance = await phantom.create();
   let page = await instance.createPage();
   await page.open(chapterLink);
-  await page.property('viewportSize', {
-    width: 1920,
-    height: 1080
-  })
+  // await page.property('viewportSize', {
+  //   width: 1920,
+  //   height: 1080
+  // })
   let content = await page.property('content')
   $ = cheerio.load(content)
   chapterUrls = []
@@ -115,14 +119,13 @@ let getChapterImageUrl = async (chapterLink) => {
   return { chapterUrls, ComicTitle, ComicChapter }
 }
 
-let getComicChapterUrlList = async (config) => {
+let getComicChapterUrlList = async (config, startUrl) => {
   config = config || { page: 1, include: DEFAULT_INCLUDE };
-  if (!config.page) throw Error('Config.page is required');
   let comicUrl = [];
   let pool = [];
   for (let i = 0; i < 1; i++) {
     pool.push(limit(() =>
-      fetch({ ...options(`https://www.manhuadui.com/manhua/haizeiwang/`) })
+      fetch({ ...options(startUrl) })
         .then($ => getComicChapterUrl($))
         .catch(err => err.toString())
     ));
@@ -142,25 +145,30 @@ let getComicChapterUrlList = async (config) => {
 
 (async () => {
   try {
-    let chapterList = await getComicChapterUrlList({
-      page: 1,
-      include: ['title', 'imgUrl', 'desc']
-    })
-    for (let chapterLink of chapterList) {
-      let { chapterUrls, ComicTitle, ComicChapter } = await getChapterImageUrl(chapterLink);
-      if (_.isEmpty(chapterUrls)) {
-        continue
+    const startUrls = ['https://www.manhuadui.com/manhua/haizeiwang/']
+    for (let startUrl of startUrls) {
+      let chapterList = await getComicChapterUrlList({
+        page: 1,
+        include: ['title', 'imgUrl']
+      }, startUrl)
+      for (let chapterLink of chapterList) {
+        let { chapterUrls, ComicTitle, ComicChapter } = await getChapterImageUrl(chapterLink);
+        if (_.isEmpty(chapterUrls)) {
+          continue
+        }
+        for (let imageUrl of chapterUrls) {
+          await downloadImage(imageUrl)
+        }
+        // 这个地方主要是转换image图片到pdf形式的，后续重构，现在发现，如果同时下载然后，走到这一步会报错，unable to write page，暂时没看出问题所在
+        // let comicList = await fs.readdirSync(`${__dirname}/${_.get(ComicTitle, '0')}/${_.get(ComicChapter, '0')}`)
+        // comicList = comicList.sort((a, b) =>
+        //   _.toNumber(_.get(_.split(a, '.'), '0')) > _.toNumber(_.get(_.split(b, '.'), '0')) ? 1 : -1
+        // );
+        // comicList = _.transform(comicList, (result, comicPath) => result.push(`${__dirname}/${_.get(ComicTitle, '0')}/${_.get(ComicChapter, '0')}/${comicPath}`), [])
+        // await img2pdf(comicList, `${__dirname}/${_.get(ComicChapter, '0')}.pdf`)
       }
-      for (let imageUrl of chapterUrls) {
-        await downloadImage(imageUrl)
-      }
-      // let comicList = await fs.readdirSync(`${__dirname}/${_.get(ComicTitle, '0')}/${_.get(ComicChapter, '0')}`)
-      // comicList = comicList.sort((a, b) =>
-      //   _.toNumber(_.get(_.split(a, '.'), '0')) > _.toNumber(_.get(_.split(b, '.'), '0')) ? 1 : -1
-      // );
-      // comicList = _.transform(comicList, (result, comicPath) => result.push(`${__dirname}/${_.get(ComicTitle, '0')}/${_.get(ComicChapter, '0')}/${comicPath}`), [])
-      // await img2pdf(comicList, `${__dirname}/${_.get(ComicChapter, '0')}.pdf`)
     }
+
     logger.info("下载完成");
   } catch (e) {
     logger.error(e);

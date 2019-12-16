@@ -217,7 +217,6 @@
     "fs-extra": "^1.0.0",
     "fs-minipass": "^1.2.7",
     "for-own": "^0.1.5",
-    "fsevents": "^1.2.9",
     "fs.realpath": "^1.0.0",
     "function-bind": "^1.1.1",
     "functional-red-black-tree": "^1.0.1",
