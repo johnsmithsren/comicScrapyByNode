@@ -244,7 +244,7 @@
     "has-value": "^1.0.0",
     "has-values": "^1.0.0",
     "hasha": "^2.2.0",
-    "hawk": "^1.1.1",
+    "hawk": "^7.0.10",
     "hoek": "^0.9.1",
     "home-or-tmp": "^2.0.0",
     "hosted-git-info": "^2.8.5",
