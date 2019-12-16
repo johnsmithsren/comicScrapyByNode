@@ -119,7 +119,7 @@
     "core-util-is": "^1.0.2",
     "cosmiconfig": "^5.2.1",
     "cross-spawn": "^6.0.5",
-    "cryptiles": "^0.2.2",
+    "cryptiles": "^4.1.3",
     "css-select": "^1.2.0",
     "css-what": "^2.1.3",
     "cssom": "^0.3.8",
