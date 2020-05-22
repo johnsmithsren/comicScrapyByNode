@@ -21,3 +21,6 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw*
+ss.json
+ss.pdf
+testresult.png
